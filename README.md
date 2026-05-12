@@ -52,9 +52,20 @@ Copy the printed token — you won't be able to see it again. Usage counts again
 
 ### 3. Get a Resend API key
 
-Sign up at https://resend.com (free tier: 100 emails/day, 3000/month). Get an API key from the dashboard.
+[Resend](https://resend.com) handles transactional email. The free tier covers this easily — 3,000 emails/month, 100/day. You'll use at most ~40/month (1 weekly plan + ~30 daily reminders, each broadcast to your recipients).
 
-Optionally, verify a domain you own so emails send from `meals@yourdomain.com` instead of the default. For a family of two recipients, the default `onboarding@resend.dev` sender is fine to start.
+1. **Sign up** at https://resend.com.
+2. **Create an API key:**
+   - Dashboard → **API Keys** → **Create API Key**.
+   - Name it something recognizable, e.g. `MealPlanner`.
+   - Permission: **Sending access** is sufficient (no need for Full access).
+   - Domain: leave as **All domains** unless you've already verified one (see step 3 below).
+   - Copy the `re_…` key immediately — Resend only shows it once. This becomes the `RESEND_API_KEY` GitHub secret in step 4.
+3. **(Optional) Verify your own sending domain.** Without this, emails send from `onboarding@resend.dev` and are visibly "via Resend" in most inboxes. To send from `meals@yourdomain.com` instead:
+   - Dashboard → **Domains** → **Add Domain**, enter the domain you own.
+   - Add the DNS records Resend shows you (SPF `TXT`, DKIM `TXT`, and an optional DMARC `TXT`) at your DNS provider. Propagation usually takes minutes.
+   - Once Resend shows the domain as **Verified**, set `email_from: "Meal Plan <meals@yourdomain.com>"` in `config.yml`.
+   - For a household of two recipients, the default sender works fine — domain verification is purely cosmetic at this scale.
 
 ### 4. Add GitHub secrets
 
