@@ -41,14 +41,14 @@ Create a **private** GitHub repo (e.g., `yourname/meal-planning`) and push this 
 
 ### 2. Generate a Claude Code OAuth token
 
-The weekly planning run authenticates as your Claude account (Max subscription), not via a pay-per-token API key. Generate a long-lived token:
+The weekly planning run authenticates as your Claude account (Pro or Max subscription), not via a pay-per-token API key. Generate a long-lived token:
 
 ```bash
-claude /status          # confirm you're logged in as the Max account
+claude /status          # confirm you're logged in
 claude setup-token      # opens a browser, prints an sk-ant-oat01-... token
 ```
 
-Copy the printed token — you won't be able to see it again. Usage counts against your Max plan's allotment rather than being billed per token. (If you'd rather use a pay-per-token API key, swap `claude_code_oauth_token:` for `anthropic_api_key:` in `.github/workflows/weekly-plan.yml` and use an `ANTHROPIC_API_KEY` secret instead.)
+Copy the printed token — you won't be able to see it again. Usage counts against your subscription's weekly allotment rather than being billed per token. One run/week on Opus is a small fraction of even the Pro weekly cap. (If you'd rather use a pay-per-token API key, swap `claude_code_oauth_token:` for `anthropic_api_key:` in `.github/workflows/weekly-plan.yml` and use an `ANTHROPIC_API_KEY` secret instead.)
 
 ### 3. Get a Resend API key
 
@@ -168,10 +168,10 @@ If anything unusual is coming up next week — travel, an event, an ingredient y
 
 ## Costs (rough monthly)
 
-- Claude: weekly planning run authenticates with a Claude Max OAuth token, so usage counts against the existing Max allotment — **no additional Anthropic charge**. One run/week is a tiny fraction of Max's weekly cap.
+- Claude: weekly planning run authenticates with a Claude Pro or Max OAuth token, so usage counts against your existing subscription allotment — **no additional Anthropic charge**. One run/week is a small fraction of even Pro's weekly cap.
 - Resend: free tier covers this easily.
 - GitHub Actions: free tier for public repos, 2000 minutes/month for private — this uses maybe 20 minutes/month.
-- Total: **$0/month** on top of the Max subscription you already pay for.
+- Total: **$0/month** on top of the Claude subscription you already pay for.
 
 ## When to retire this
 
