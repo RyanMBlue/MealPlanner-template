@@ -1,0 +1,33 @@
+# Meal Planning Configuration
+#
+# Edit these values before the first run.
+
+# Who receives emails
+email_recipients:
+  - you@example.com
+  - partner@example.com
+
+# Email sender (must be a verified domain in Resend, or use the default)
+# Default: onboarding@resend.dev (works out of the box, marked as from Resend)
+email_from: "Meal Plan <onboarding@resend.dev>"
+
+# Timezone for date computations
+timezone: "America/New_York"
+
+# Family context (referenced by the Claude prompt)
+family:
+  adults: 2
+  kids_ages: []   # e.g. [12, 9, 6]
+
+# Bring! shopping-list integration (optional). Opt-in by uncommenting.
+# The list name must match a list in your Bring! account exactly.
+# bring:
+#   list_name: "Groceries"
+
+# Friday request emails (optional). Opt-in by uncommenting this block.
+# Requires:
+#   - 2FA enabled on the Google account at `gmail_user`
+#   - GMAIL_APP_PASSWORD secret containing a 16-char Google app password
+#   - `allowlist` defaults to `email_recipients` above if omitted
+# requests:
+#   gmail_user: you@gmail.com

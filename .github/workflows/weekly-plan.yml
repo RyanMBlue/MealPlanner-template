@@ -1,0 +1,95 @@
+name: Weekly Meal Plan
+
+on:
+  schedule:
+    # Saturdays at 12:00 UTC: 8am ET during EDT, 7am ET during EST.
+    # We don't bother splitting the cron for DST — either delivery time is fine.
+    - cron: "0 12 * * 6"
+  workflow_dispatch: {}
+
+# Let only one run of this workflow happen at a time — prevents a manual trigger
+# racing with a cron trigger and both trying to commit.
+concurrency:
+  group: weekly-plan
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so commits work cleanly
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install script dependencies
+        run: pip install pyyaml requests bring-api
+
+      - name: Guard against re-fire of an already-planned week
+        env:
+          BRING_EMAIL: ${{ secrets.BRING_EMAIL }}
+          BRING_PASSWORD: ${{ secrets.BRING_PASSWORD }}
+        run: python scripts/regenerate_guard.py
+
+      - name: Fetch next-week requests from inbox
+        continue-on-error: true
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python scripts/fetch_requests.py
+
+      - name: Invoke Claude to generate the plan
+        uses: anthropics/claude-code-base-action@v0.0.63
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt_file: prompts/weekly-plan.md
+          # WebFetch removed: pre-verification is the downstream
+          # validate_recipe_urls.py step's job, and WebFetch retries
+          # exhausted Claude's turn budget on 2026-04-25 (issue #28).
+          allowed_tools: "Read,Write,Edit,WebSearch"
+          model: claude-opus-4-7
+          max_turns: "40"
+          timeout_minutes: "20"
+
+      - name: Verify Claude wrote a plan for the upcoming week
+        # Defense against silent Claude failures (max-turn exhaustion,
+        # timeout, partial write). Without this, downstream steps would
+        # commit, push, and email the previous week's plan. See #26.
+        run: python scripts/verify_plan_covers_week.py
+
+      - name: Validate recipe URLs
+        run: python scripts/validate_recipe_urls.py
+
+      - name: Push shopping list to Bring!
+        env:
+          BRING_EMAIL: ${{ secrets.BRING_EMAIL }}
+          BRING_PASSWORD: ${{ secrets.BRING_PASSWORD }}
+        run: python scripts/push_to_bring.py
+
+      - name: Commit and push the plan
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- current-week.md meal-history.md notes.md bring_state.json \
+             && ! git ls-files --others --exclude-standard -- bring_state.json | grep -q .; then
+            echo "No changes to commit — skipping."
+            exit 0
+          fi
+          WEEK_OF=$(TZ=America/New_York date -d 'next Monday' +%Y-%m-%d)
+          git add current-week.md meal-history.md notes.md bring_state.json
+          git commit -m "Weekly plan: week of ${WEEK_OF}"
+          git push origin ${{ github.ref_name }}
+
+      - name: Send weekly plan email
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: python scripts/send_weekly_plan.py

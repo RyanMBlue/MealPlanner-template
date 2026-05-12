@@ -1,0 +1,36 @@
+name: Friday Request Prompt
+
+on:
+  schedule:
+    # Fridays at 12:00 UTC: 8am ET during EDT, 7am ET during EST.
+    # Mirrors weekly-plan.yml — for a once-a-week email, either delivery
+    # time is fine; not worth splitting the cron for DST.
+    - cron: "0 12 * * 5"
+  workflow_dispatch: {}
+
+concurrency:
+  group: friday-request-prompt
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prompt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install script dependencies
+        run: pip install pyyaml requests
+
+      - name: Send request prompt
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: python scripts/send_request_prompt.py

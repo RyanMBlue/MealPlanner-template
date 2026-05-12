@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+*.zip
+requests-inbox.md
+bring_state.json
