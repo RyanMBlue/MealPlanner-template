@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Fetch next-week meal requests from Gmail via IMAP.
 
-Runs Saturday morning before the Claude invocation. Reads unread replies
-matching the magic subject tag, splits them into three weighted sections,
-writes requests-inbox.md. Fails soft — any error logs and exits 0.
+Runs Saturday morning before the Claude invocation. Reads replies matching
+the magic subject tag (regardless of read state), splits them into three
+weighted sections, writes requests-inbox.md. Fails soft — any error logs
+and exits 0.
 """
 from __future__ import annotations
 
@@ -46,6 +47,15 @@ _QUOTE_MARKERS = (
     re.compile(r"^-----\s*Original Message\s*-----\s*$"),
 )
 
+# One or more leading `>` quote prefixes (Gmail/Outlook indent quoted lines).
+_QUOTE_PREFIX_RE = re.compile(r"^\s*(?:>\s?)+")
+
+# A line that is solely a parenthetical — the prompt's placeholder hints, e.g.
+# "(hard constraints — ...)". Template scaffolding, never a real answer, so it's
+# dropped when it appears under a heading. Matching on shape (not exact text)
+# survives the encoding/truncation drift seen in real replies' text/plain parts.
+_HINT_RE = re.compile(r"^\(.*\)$")
+
 SECTION_KEYS = ("must", "soft", "use_up")
 
 _HEADING_TO_KEY = {
@@ -63,40 +73,28 @@ _SECTION_TITLES = {
 _HEADING_RE = re.compile(r"^\s*#{2,3}\s+(.+?)\s*$")
 
 
-def strip_quoted_reply(body: str) -> str:
-    """Cut the body at the first quote-reply marker.
+def normalize_reply_body(body: str) -> str:
+    """Flatten a reply so section parsing sees the sender's answers.
 
-    Recognizes three cases, whichever appears first:
-    - Gmail's `On <date> ... wrote:` line
-    - Outlook's `-----Original Message-----` separator
-    - A contiguous block of `>`-prefixed lines that follows a blank line
-      (catches clients that omit a preamble marker entirely)
+    The prompt tells recipients to "type under each heading below" — but the
+    headings live in the quoted original, so many clients place the answer
+    lines *inside* the quoted block. Discarding the quote wholesale (the old
+    behavior) therefore threw the answers away. Instead we:
 
-    Returns the body unchanged if no marker is found.
+    - drop quote-attribution lines (`On … wrote:`, `-----Original Message-----`)
+    - strip leading `>` quote prefixes from every remaining line
+
+    so a quoted `> ## Use up` / `> Ground beef` pair parses just like an
+    un-quoted answer. Content before the first known heading and the
+    parenthetical placeholder hints are dropped downstream by `parse_sections`.
     """
-    lines = body.splitlines()
-    cut_at: int | None = None
-    for i, line in enumerate(lines):
+    out: list[str] = []
+    for line in body.splitlines():
         stripped = line.strip()
-        for marker in _QUOTE_MARKERS:
-            if marker.match(stripped):
-                cut_at = i
-                break
-        if cut_at is not None:
-            break
-        # Detect a quote block: a `>`-prefixed line preceded by a blank line
-        # (or the start of the buffer). Requiring the preceding blank avoids
-        # false positives on user content that happens to start a line with `>`.
-        if line.startswith(">") and (i == 0 or not lines[i - 1].strip()):
-            cut_at = i
-            break
-
-    if cut_at is None:
-        return body
-    kept = lines[:cut_at]
-    while kept and not kept[-1].strip():
-        kept.pop()
-    return "\n".join(kept) + ("\n" if kept else "")
+        if any(marker.match(stripped) for marker in _QUOTE_MARKERS):
+            continue
+        out.append(_QUOTE_PREFIX_RE.sub("", line))
+    return "\n".join(out)
 
 
 def parse_sections(body: str) -> dict[str, str]:
@@ -104,9 +102,9 @@ def parse_sections(body: str) -> dict[str, str]:
 
     Headings are matched case-insensitively against `## Must have / Must
     avoid`, `## Soft preferences`, and `## Use up` (also H3). Content
-    before the first known heading or under an unknown heading is dropped.
-    Returns a dict with keys `must`, `soft`, `use_up`; missing sections
-    map to "".
+    before the first known heading or under an unknown heading is dropped,
+    as are the prompt's parenthetical placeholder-hint lines. Returns a
+    dict with keys `must`, `soft`, `use_up`; missing sections map to "".
     """
     sections: dict[str, list[str]] = {k: [] for k in SECTION_KEYS}
     current: str | None = None
@@ -117,6 +115,8 @@ def parse_sections(body: str) -> dict[str, str]:
             current = key  # may be None for unknown headings
             continue
         if current is not None:
+            if _HINT_RE.match(raw.strip()):
+                continue  # template placeholder hint, not a real answer
             sections[current].append(raw)
     return {k: "\n".join(lines).strip("\n") for k, lines in sections.items()}
 
@@ -173,8 +173,8 @@ def process_message(msg: Message, allowlist: list[str]) -> dict | None:
         return None
 
     body = extract_text_body(msg)
-    stripped = strip_quoted_reply(body)
-    sections = parse_sections(stripped)
+    normalized = normalize_reply_body(body)
+    sections = parse_sections(normalized)
     if not any(sections.values()):
         return None
 
@@ -238,14 +238,20 @@ def load_config() -> dict | None:
 def fetch_messages(gmail_user: str, app_password: str, tag: str) -> list[Message]:
     """Connect to Gmail, return parsed Message objects matching the subject tag.
 
-    Marks each fetched UID as \\Seen so repeated runs are idempotent.
+    Searches by subject tag regardless of read state. An earlier `UNSEEN`
+    filter here silently dropped any reply a human had already opened between
+    the Friday prompt and the Saturday run — the common case, not the edge
+    case. Idempotence instead comes from the weekly run rebuilding
+    requests-inbox.md from scratch, so reprocessing already-seen messages is
+    harmless. The \\Seen mark is still set, purely as inbox housekeeping.
     """
     imap = imaplib.IMAP4_SSL("imap.gmail.com", 993)
     try:
         imap.login(gmail_user, app_password)
         imap.select("INBOX")
-        # IMAP SEARCH SUBJECT performs a substring match
-        typ, data = imap.search(None, "UNSEEN", "SUBJECT", f'"{tag}"')
+        # IMAP SEARCH SUBJECT performs a substring match. No read-state filter:
+        # UNSEEN dropped replies a human had already opened (see docstring).
+        typ, data = imap.search(None, "SUBJECT", f'"{tag}"')
         if typ != "OK":
             print(f"fetch_requests: IMAP search returned {typ}", file=sys.stderr)
             return []

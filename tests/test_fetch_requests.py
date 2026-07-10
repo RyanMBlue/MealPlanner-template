@@ -8,10 +8,10 @@ from fetch_requests import (
     extract_sender,
     extract_text_body,
     is_allowed,
+    normalize_reply_body,
     parse_sections,
     process_message,
     render_output,
-    strip_quoted_reply,
     subject_tag,
     target_monday,
 )
@@ -41,66 +41,45 @@ class TestSubjectTag:
         assert subject_tag(date(2026, 5, 18)) == "[meal-plan request: 2026-05-18]"
 
 
-class TestStripQuotedReply:
-    def test_cuts_at_gmail_on_wrote_marker(self):
+class TestNormalizeReplyBody:
+    def test_drops_gmail_on_wrote_attribution_line(self):
         body = (
             "## Must have / Must avoid\n"
             "- no fish\n"
             "\n"
             "On Fri, May 15, 2026 at 8:00 AM Meal Plan <meals@example.com> wrote:\n"
-            "> What do you want for the week of...\n"
+            "> quoted stuff\n"
         )
-        result = strip_quoted_reply(body)
+        result = normalize_reply_body(body)
         assert "no fish" in result
         assert "wrote:" not in result
-        assert "What do you want" not in result
 
-    def test_cuts_at_outlook_original_message_marker(self):
+    def test_drops_outlook_original_message_line(self):
         body = (
             "## Soft preferences\n"
             "- lean Italian\n"
-            "\n"
             "-----Original Message-----\n"
-            "From: meals@example.com\n"
-            "Subject: ...\n"
+            "> From: meals@example.com\n"
         )
-        result = strip_quoted_reply(body)
+        result = normalize_reply_body(body)
         assert "lean Italian" in result
         assert "Original Message" not in result
 
-    def test_no_marker_returns_input_unchanged(self):
-        body = "## Use up\n- arborio rice\n"
-        assert strip_quoted_reply(body) == body
+    def test_strips_leading_quote_prefixes(self):
+        # The core fix: answers typed inside the quoted block keep their
+        # headings, so dequoting lets parse_sections see them.
+        body = "> ## Use up\n> Ground beef, fresh green beans\n"
+        result = normalize_reply_body(body)
+        assert result == "## Use up\nGround beef, fresh green beans"
 
-    def test_strips_trailing_whitespace_only_lines(self):
-        # "On Fri wrote:" matches the marker; the kept portion has trailing
-        # blank/whitespace-only lines that should be trimmed.
-        body = "## Soft preferences\n- lean Italian\n   \n\nOn Fri wrote:\n> q\n"
-        result = strip_quoted_reply(body)
-        assert "lean Italian" in result
-        assert "wrote:" not in result
-        # Kept portion shouldn't end with the stray whitespace-only lines.
-        assert not result.endswith("   \n")
+    def test_strips_nested_quote_prefixes(self):
+        body = ">> ## Use up\n>> arborio rice\n"
+        result = normalize_reply_body(body)
+        assert result == "## Use up\narborio rice"
 
-    def test_cuts_at_bare_blockquote_when_no_preamble_marker(self):
-        # A client that omits the "On ... wrote:" preamble can leave just the
-        # `> ` quoted block. Cut at the first `>` line preceded by a blank.
-        body = (
-            "## Must have / Must avoid\n"
-            "- no fish\n"
-            "\n"
-            "> ## Must have / Must avoid\n"
-            "> (hard constraints...)\n"
-        )
-        result = strip_quoted_reply(body)
-        assert "no fish" in result
-        assert "hard constraints" not in result
-
-    def test_blockquote_without_preceding_blank_is_preserved(self):
-        # A `>` line without a preceding blank is user content (e.g. a typo or
-        # markdown blockquote), not a quote-reply marker.
-        body = "## Use up\n- arborio rice\n> a note from me\n"
-        assert strip_quoted_reply(body) == body
+    def test_unquoted_body_passes_through(self):
+        body = "## Use up\n- arborio rice"
+        assert normalize_reply_body(body) == body
 
 
 class TestParseSections:
@@ -175,6 +154,18 @@ class TestParseSections:
         assert result["must"] == ""
         assert result["soft"] == ""
         assert result["use_up"] == ""
+
+    def test_parenthetical_hint_lines_are_dropped(self):
+        # The prompt's placeholder hints sit under each heading; they must not
+        # leak into captured content when a reply quotes the whole template.
+        body = (
+            "## Must have / Must avoid\n"
+            '(hard constraints — e.g. "no fish", "tacos one night")\n'
+            "no dairy\n"
+        )
+        result = parse_sections(body)
+        assert result["must"].strip() == "no dairy"
+        assert "hard constraints" not in result["must"]
 
     def test_section_keys_constant(self):
         assert SECTION_KEYS == ("must", "soft", "use_up")
@@ -288,6 +279,43 @@ class TestProcessMessage:
         )
         msg = _make_msg("ryan@example.com", body)
         assert process_message(msg, ["ryan@example.com"]) is None
+
+    def test_real_reply_typed_inside_quoted_template(self):
+        # Regression for issue #43: a reply that quotes the whole prompt and
+        # types answers *inside* the quote (directly under the quoted headings,
+        # which is what the prompt instructs) must still be captured. Body
+        # modeled on the real 2026-07-06 reply that was silently dropped.
+        body = (
+            "On Jul 3, 2026 at 10:11 AM -0400, Meal Plan <meals@example.com>, wrote:\n"
+            "\n"
+            "> What do you want for the week of Mon Jul 06 — Sun Jul 12?\n"
+            ">\n"
+            "> Reply to this email. Type under each heading below.\n"
+            "> Leave a section blank if there's nothing for it.\n"
+            "> Send any time before Saturday 8am ET.\n"
+            ">\n"
+            "> ## Must have / Must avoid\n"
+            '> (hard constraints — e.g. "no fish", "tacos one night")\n'
+            ">\n"
+            ">\n"
+            "> ## Soft preferences\n"
+            "> (suggestions — ...)\n"
+            "> The kids won't be home for dinner Tuesday through Friday next week.\n"
+            ">\n"
+            "> ## Use up\n"
+            "> (ingredients in the fridge/pantry to lean on)\n"
+            "> Ground beef, fresh green beans\n"
+        )
+        msg = _make_msg("gina@example.com", body)
+        result = process_message(msg, ["gina@example.com"])
+        assert result is not None
+        assert result["sections"]["must"].strip() == ""
+        assert "kids won't be home" in result["sections"]["soft"]
+        assert result["sections"]["use_up"].strip() == "Ground beef, fresh green beans"
+        # Template scaffolding must not leak into captured content.
+        assert "suggestions" not in result["sections"]["soft"]
+        assert "ingredients in the fridge" not in result["sections"]["use_up"]
+        assert "What do you want" not in result["sections"]["soft"]
 
 
 class TestRenderOutput:
