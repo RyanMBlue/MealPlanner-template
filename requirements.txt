@@ -1,0 +1,6 @@
+# Core runtime dependencies for the automation scripts, pinned so a
+# transitive release can't silently break weekly planning, daily reminders,
+# or request ingestion. Bump intentionally (see README "Debugging").
+# Used by all three workflows.
+pyyaml==6.0.3
+requests==2.34.2

@@ -33,7 +33,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install script dependencies
-        run: pip install pyyaml requests bring-api
+        run: pip install -r requirements-weekly.txt
 
       - name: Guard against re-fire of an already-planned week
         env:

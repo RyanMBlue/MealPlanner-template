@@ -176,6 +176,7 @@ If anything unusual is coming up next week — travel, an event, an ingredient y
 - **Email didn't arrive:** check Resend's dashboard for delivery logs.
 - **Claude suggested something I just ate:** check that `meal-history.md` has the recent meal with a date within 30 days. If yes, re-run the workflow and check logs.
 - **Claude hallucinated a bad recipe URL:** the prompt tells it to verify, but LLMs still occasionally miss. If it happens often, tighten the prompt's verification step.
+- **Updating Python dependencies:** the workflows install pinned versions from `requirements.txt` (shared core: PyYAML, requests) and `requirements-weekly.txt` (adds `bring-api` for the optional Bring! push). To bump, edit the pin(s) in those files and commit — nothing else installs deps. Pinning keeps a transitive release from silently breaking a run; update deliberately.
 
 ## Costs (rough monthly)
 
