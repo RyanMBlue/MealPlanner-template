@@ -60,11 +60,15 @@ For each of the 7 meals, find a recipe URL matching the dish. Prefer: Serious Ea
 
 **Do not WebFetch URLs to verify them.** A workflow step downstream (`scripts/validate_recipe_urls.py`) checks every URL with HTTP requests after you finish — that's its job, not yours. WebFetch is unreliable in this environment and will burn through your turn budget; in 2026-04-25's run, retrying WebFetch on transient errors caused max-turns exhaustion before the plan was written.
 
-How to pick URLs:
+**A URL you're not confident in is worse than no URL.** The downstream validator strips dead links, which leaves the reader with neither a link nor a way to cook the dish. So only attach a URL when you're genuinely confident it's a real, canonical page; otherwise give a short method the reader can cook from. Every meal must end up with **at least one** of: a confident URL, or a 1–2 sentence method.
 
-1. Use your own knowledge of well-known recipes from the preferred sites — many of them you already know the canonical URL for (e.g. Smitten Kitchen, Cookie and Kate, Half Baked Harvest follow stable URL patterns).
-2. If you're unsure, do **one** WebSearch per dish to surface a candidate. Trust the top result from a reputable source listed above.
-3. If no good candidate appears, omit the URL and include a detailed one-line description in `**Recipe:**` instead (e.g. "no link — pan-sear chops, deglaze with apple cider + Dijon, finish with thyme butter").
+How to fill `**Recipe:**`:
+
+1. **Confident URL** — use your own knowledge of well-known recipes from the preferred sites (many follow stable, canonical URL patterns, e.g. Smitten Kitchen, Cookie and Kate, Half Baked Harvest). Write `**Recipe:** <URL>`.
+2. **Unsure** — do **one** WebSearch per dish to surface a candidate from a reputable source above. Only use it if you're now confident it's a real canonical page.
+3. **Not confident** — do **not** gamble on a shaky URL. Write `**Recipe:** no link — <1–2 sentence method>`: a brief technique summary someone could actually cook from (protein prep + cooking method + sauce/finish), e.g. `no link — pan-sear chops, deglaze with apple cider + Dijon, finish with thyme butter`. Keep it to 1–2 sentences so it fits the weekly email and daily reminder.
+
+Do **not** paste a URL you expect to fail "just in case" — a stripped URL is noise, the method is what stays useful.
 
 Budget: aim to spend no more than ~10 turns total on URL selection. The downstream validator will catch any 404s and bot-blocks for you.
 
@@ -79,7 +83,7 @@ Overwrite `current-week.md` with **exactly** this structure. The format matters 
 - **Description:** [one line]
 - **Active time:** [X min]  |  **Total time:** [X min, or "flag: long passive"]
 - **Protein:** [type]
-- **Recipe:** [URL or "no link — see description"]
+- **Recipe:** [confident URL, else "no link — <1–2 sentence method>"]
 - **Notes:** [kid modifications, ingredient overlaps, flexibility notes]
 
 ## Tuesday YYYY-MM-DD — [Dish Name]
@@ -136,7 +140,7 @@ Append a new entry for each of the 7 meals, using the correct date per day. Each
 - **Description:** [same one-liner from current-week.md]
 - **Active time:** [X min]  |  **Total time:** [X min, or "flag: long passive"]
 - **Protein:** [type]
-- **Recipe:** [URL or "no link — see description"]
+- **Recipe:** [confident URL, else "no link — <1–2 sentence method>"]
 - **Rating:**
 - **Notes:**
 ```
@@ -175,7 +179,7 @@ Make sure `current-week.md`, `meal-history.md`, and (if you edited it) `notes.md
 - [ ] Applied any relevant entries from `notes.md` and called them out in "Plan notes"
 - [ ] Protein spread varied across the week
 - [ ] Perishable meals early in the week
-- [ ] Each recipe URL picked from a reputable source (validation runs downstream — don't WebFetch)
+- [ ] Each meal has either a confident recipe URL from a reputable source or a 1–2 sentence "no link — method" fallback — no shaky/guessed URLs (validation runs downstream — don't WebFetch)
 - [ ] `current-week.md` follows the exact format (daily reminder parser depends on it)
 - [ ] `meal-history.md` appended to, not overwritten
 - [ ] `notes.md` pruned of entries the just-planned week consumed
