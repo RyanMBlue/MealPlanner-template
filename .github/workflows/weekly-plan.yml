@@ -5,7 +5,13 @@ on:
     # Saturdays at 12:00 UTC: 8am ET during EDT, 7am ET during EST.
     # We don't bother splitting the cron for DST — either delivery time is fine.
     - cron: "0 12 * * 6"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      target_monday:
+        description: "Target week's Monday (YYYY-MM-DD). Leave blank to plan the upcoming week."
+        required: false
+        type: string
+        default: ""
 
 # Let only one run of this workflow happen at a time — prevents a manual trigger
 # racing with a cron trigger and both trying to commit.
@@ -35,6 +41,21 @@ jobs:
       - name: Install script dependencies
         run: pip install pyyaml requests bring-api
 
+      - name: Resolve target week
+        # Single source of truth for which Monday this run plans. On the
+        # scheduled Saturday run (or a manual run with no input) this is the
+        # upcoming Monday; a manual run can pass an explicit Monday to backfill
+        # or test a specific week. Invalid input fails here, before Claude runs.
+        # Writes target-week.md (the Claude step has no Bash tool, so it reads
+        # the target from a file) and exports TARGET_MONDAY for later steps.
+        env:
+          INPUT_TARGET_MONDAY: ${{ github.event.inputs.target_monday }}
+        run: |
+          set -euo pipefail
+          MONDAY="$(python scripts/week_target.py --monday "$INPUT_TARGET_MONDAY" --emit-file target-week.md)"
+          echo "TARGET_MONDAY=$MONDAY" >> "$GITHUB_ENV"
+          echo "Planning week of $MONDAY"
+
       - name: Guard against re-fire of an already-planned week
         env:
           BRING_EMAIL: ${{ secrets.BRING_EMAIL }}
@@ -60,7 +81,7 @@ jobs:
           max_turns: "40"
           timeout_minutes: "20"
 
-      - name: Verify Claude wrote a plan for the upcoming week
+      - name: Verify Claude wrote a plan for the target week
         # Defense against silent Claude failures (max-turn exhaustion,
         # timeout, partial write). Without this, downstream steps would
         # commit, push, and email the previous week's plan. See #26.
@@ -84,9 +105,8 @@ jobs:
             echo "No changes to commit — skipping."
             exit 0
           fi
-          WEEK_OF=$(TZ=America/New_York date -d 'next Monday' +%Y-%m-%d)
           git add current-week.md meal-history.md notes.md bring_state.json
-          git commit -m "Weekly plan: week of ${WEEK_OF}"
+          git commit -m "Weekly plan: week of ${TARGET_MONDAY}"
           git push origin ${{ github.ref_name }}
 
       - name: Send weekly plan email

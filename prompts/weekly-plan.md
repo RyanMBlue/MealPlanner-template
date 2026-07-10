@@ -15,11 +15,12 @@ Read these files from the repo root:
 
 ## Step 2: Determine the target week
 
-The target week is the upcoming Monday through the following Sunday.
+The week this run plans is fixed by the workflow, not inferred from today's date. **Read `target-week.md`** (written to the repo root before you start): it states the target week's **Monday** and **Sunday**.
 
-- Today is Saturday (the GitHub Action is scheduled for Saturdays). The target week starts 2 days from now.
-- Compute the actual date of each day (Mon/Tue/Wed/Thu/Fri/Sat/Sun) using the timezone in `config.yml`.
+- The target week is that Monday through that Sunday.
+- Compute the actual date of each day (Mon/Tue/Wed/Thu/Fri/Sat/Sun) from that Monday, using the timezone in `config.yml`.
 - Use real YYYY-MM-DD dates in all output.
+- Normal Saturday runs plan the upcoming week; a manual run may target an explicit earlier/later week (a backfill). Either way, `target-week.md` is authoritative — never override it with a date you derived yourself.
 
 ## Step 3: Parse history
 
