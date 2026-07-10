@@ -23,11 +23,12 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import yaml
+
+from week_target import ENV_VAR, resolve_target_monday
 
 CONFIG = Path("config.yml")
 PLAN = Path("current-week.md")
@@ -43,11 +44,15 @@ def load_timezone() -> str:
 
 
 def target_week(tz_name: str) -> tuple[date, date]:
-    """Return (monday, sunday) of the upcoming target week."""
-    today = datetime.now(ZoneInfo(tz_name)).date()
-    # weekday(): Monday=0..Sunday=6. Days until next Monday (1..7; never 0).
-    days_to_monday = (7 - today.weekday()) % 7 or 7
-    monday = today + timedelta(days=days_to_monday)
+    """Return (monday, sunday) of the week this run targets.
+
+    Honors ``$TARGET_MONDAY`` when the weekly workflow set it (issue #3), so a
+    manual backfill scrubs the *target* week's stale `current-week.md`,
+    `meal-history.md`, and `bring_state.json` — not the wall-clock upcoming
+    week. Falls back to the upcoming Monday on a normal run. Raises ValueError
+    on a malformed explicit target (the workflow validates it upstream first).
+    """
+    monday = resolve_target_monday(tz_name, os.environ.get(ENV_VAR))
     sunday = monday + timedelta(days=6)
     return monday, sunday
 
@@ -242,7 +247,13 @@ def scrub_bring(monday: date, sunday: date, tz_name: str) -> int:
 
 def main() -> None:
     tz_name = load_timezone()
-    monday, sunday = target_week(tz_name)
+    try:
+        monday, sunday = target_week(tz_name)
+    except ValueError as exc:
+        # Shouldn't happen — the workflow validates $TARGET_MONDAY before this
+        # step — but never fail the guard on it (this script always exits 0).
+        print(f"regenerate_guard: invalid {ENV_VAR}: {exc} — skipping scrub", file=sys.stderr)
+        return
     print(f"Target week: {monday}..{sunday} ({tz_name})")
 
     deleted_plan = scrub_current_week(monday, sunday)

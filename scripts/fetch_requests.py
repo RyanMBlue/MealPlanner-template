@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+from week_target import ENV_VAR, resolve_target_monday
+
 
 CONFIG_PATH = Path("config.yml")
 OUTPUT_PATH = Path("requests-inbox.md")
@@ -36,6 +38,18 @@ def target_monday(now: datetime) -> date:
     """
     today = now.date()
     return today + timedelta(days=(7 - today.weekday()))
+
+
+def run_target_monday(tz_name: str, now: datetime) -> date:
+    """The Monday this ingestion run targets.
+
+    Honors ``$TARGET_MONDAY`` when the weekly workflow set it (issue #3), so
+    request ingestion stays on the same week as the prompt, verifier, and
+    sender — a manual backfill won't pull the *upcoming* week's replies into an
+    older target week. Falls back to the upcoming Monday, which equals
+    ``target_monday(now)`` on a normal run.
+    """
+    return resolve_target_monday(tz_name, os.environ.get(ENV_VAR), today=now.date())
 
 
 def subject_tag(monday: date) -> str:
@@ -296,9 +310,13 @@ def main() -> None:
 
     tz_name = config.get("timezone", "America/New_York")
     now = datetime.now(ZoneInfo(tz_name))
-    monday = target_monday(now)
+    try:
+        monday = run_target_monday(tz_name, now)
+    except ValueError as e:
+        print(f"fetch_requests: invalid {ENV_VAR}: {e}", file=sys.stderr)
+        return
     tag = subject_tag(monday)
-    print(f"fetch_requests: looking for unread messages with subject {tag!r}")
+    print(f"fetch_requests: looking for messages with subject {tag!r}")
 
     try:
         messages = fetch_messages(gmail_user, app_password, tag)

@@ -12,6 +12,7 @@ from fetch_requests import (
     parse_sections,
     process_message,
     render_output,
+    run_target_monday,
     subject_tag,
     target_monday,
 )
@@ -33,6 +34,27 @@ class TestTargetMonday:
         # plan week so a Friday rerun never matches the current week).
         now = datetime(2026, 5, 18, 9, 0, tzinfo=ZoneInfo("America/New_York"))
         assert target_monday(now).isoformat() == "2026-05-25"
+
+
+class TestRunTargetMonday:
+    """Request ingestion must target the same week as the rest of the workflow
+    (issue #3): honor $TARGET_MONDAY when set, else the upcoming Monday."""
+
+    def test_honors_explicit_target_monday_env(self, monkeypatch):
+        monkeypatch.setenv("TARGET_MONDAY", "2026-08-03")
+        # Run "on" a Friday well before the explicit target — env must win.
+        now = datetime(2026, 7, 10, 9, 0, tzinfo=ZoneInfo("America/New_York"))
+        assert run_target_monday("America/New_York", now) == _date(2026, 8, 3)
+
+    def test_falls_back_to_upcoming_when_unset(self, monkeypatch):
+        monkeypatch.delenv("TARGET_MONDAY", raising=False)
+        now = datetime(2026, 7, 3, 9, 0, tzinfo=ZoneInfo("America/New_York"))  # Friday
+        assert run_target_monday("America/New_York", now) == _date(2026, 7, 6)
+
+    def test_blank_env_falls_back_to_upcoming(self, monkeypatch):
+        monkeypatch.setenv("TARGET_MONDAY", "   ")
+        now = datetime(2026, 7, 3, 9, 0, tzinfo=ZoneInfo("America/New_York"))  # Friday
+        assert run_target_monday("America/New_York", now) == _date(2026, 7, 6)
 
 
 class TestSubjectTag:
