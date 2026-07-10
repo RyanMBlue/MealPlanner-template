@@ -15,6 +15,7 @@ import requests
 import yaml
 
 from verify_plan_covers_week import plan_covers_week
+from week_target import ENV_VAR, parse_monday
 
 
 def load_config() -> dict:
@@ -56,9 +57,15 @@ def verify_plan_is_fresh(config: dict, plan_md: str) -> None:
     Defense against the 2026-04-25 failure mode where Claude exhausted
     its turn budget without writing a fresh plan and the email step
     happily re-sent the prior week's. See issue #27.
+
+    When the workflow set ``$TARGET_MONDAY`` (always, since issue #3), we check
+    the plan against exactly the week this run planned — the same source the
+    prompt and verifier used. Otherwise we fall back to inferring the expected
+    week from the day of the week (for running this script outside the flow).
     """
     tz_name = config.get("timezone") or "America/New_York"
-    monday = expected_plan_monday(tz_name)
+    target = os.environ.get(ENV_VAR)
+    monday = parse_monday(target) if target and target.strip() else expected_plan_monday(tz_name)
     if not plan_covers_week(plan_md, monday):
         sys.exit(
             f"ERROR: current-week.md does not contain a Monday heading for "

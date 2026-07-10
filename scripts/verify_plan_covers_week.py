@@ -13,30 +13,15 @@ Exit code:
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-import yaml
+from week_target import ENV_VAR, load_timezone, resolve_target_monday
 
-CONFIG = Path("config.yml")
 PLAN = Path("current-week.md")
-
-
-def load_timezone() -> str:
-    if not CONFIG.exists():
-        return "America/New_York"
-    cfg = yaml.safe_load(CONFIG.read_text()) or {}
-    return cfg.get("timezone") or "America/New_York"
-
-
-def upcoming_monday(tz_name: str) -> date:
-    """Return the next Monday strictly after today in the given timezone."""
-    today = datetime.now(ZoneInfo(tz_name)).date()
-    days = (7 - today.weekday()) % 7 or 7
-    return today + timedelta(days=days)
 
 
 def plan_covers_week(md: str, monday: date) -> bool:
@@ -49,8 +34,11 @@ def plan_covers_week(md: str, monday: date) -> bool:
 
 
 def main() -> int:
-    tz_name = load_timezone()
-    monday = upcoming_monday(tz_name)
+    try:
+        monday = resolve_target_monday(load_timezone(), os.environ.get(ENV_VAR))
+    except ValueError as exc:
+        print(f"FAIL: invalid {ENV_VAR}: {exc}", file=sys.stderr)
+        return 1
 
     if not PLAN.exists():
         print(
