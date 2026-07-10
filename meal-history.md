@@ -14,7 +14,7 @@ Each entry is a level-3 heading with the date in YYYY-MM-DD format, followed by:
 - **Rating:** `hit` / `miss` / `mixed` / blank (not yet rated)
 - **Notes:** modifications, kid reactions, what to change next time
 
-The first five fields are written by the weekly workflow and mirror what landed in `current-week.md` for the same day. **Rating** and **Notes** are for Ryan/Gina to fill in during or after the week.
+The first five fields are written by the weekly workflow and mirror what landed in `current-week.md` for the same day. **Rating** and **Notes** are for you (and anyone else in the household) to fill in during or after the week.
 
 ## Real entries start below this line
 
