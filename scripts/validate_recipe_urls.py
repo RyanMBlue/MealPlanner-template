@@ -80,6 +80,17 @@ def classify(url: str) -> tuple[str, str]:
     return "skip", f"HTTP {code} (could not verify)"
 
 
+def stripped_recipe_line(prefix: str) -> str:
+    """Replacement for a Recipe line whose URL was definitively broken.
+
+    Points the reader at the dish description instead of the dead link. Unlike
+    the earlier behavior, it does **not** echo the raw dead URL into the
+    user-facing plan (issue #4) — a broken link is noise there. The URL is still
+    printed in the run logs and the end-of-run "Stripped" summary for debugging.
+    """
+    return f"{prefix}no link — see description"
+
+
 def main() -> None:
     if not PLAN.exists():
         print(f"ERROR: {PLAN} not found — nothing to validate", file=sys.stderr)
@@ -112,10 +123,7 @@ def main() -> None:
         # strip
         print(f"  STRIP  [{reason}] {url}")
         stripped.append((url, reason))
-        return (
-            f"{prefix}no link — see description "
-            f"(proposed URL did not resolve: {url})"
-        )
+        return stripped_recipe_line(prefix)
 
     new_text = RECIPE_LINE.sub(replace, text)
 
