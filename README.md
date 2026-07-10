@@ -159,7 +159,7 @@ Multiple replies (e.g. you and your partner both reply) are merged per section w
 
 **Behavior:**
 
-- The Saturday workflow connects to Gmail via IMAP, fetches unread messages whose subject contains the magic tag `[meal-plan request: <upcoming-Monday>]`, validates the sender against the `allowlist` (defaults to `email_recipients`), strips quoted-reply content, splits the body by the three known headings, and writes `requests-inbox.md`.
+- The Saturday workflow connects to Gmail via IMAP, fetches messages whose subject contains the magic tag `[meal-plan request: <upcoming-Monday>]` **regardless of read state** (then marks them read as inbox housekeeping — an earlier version filtered on unread and silently dropped replies someone had already opened), validates the sender against the `allowlist` (defaults to `email_recipients`), **normalizes quoted replies** (removes attribution lines and `>` prefixes so answers typed directly under the quoted headings are captured, rather than discarding the quoted block), splits the body by the three known headings, and writes `requests-inbox.md`.
 - The Claude prompt reads that file and applies its sections during planning.
 - After the plan is written, Claude deletes `requests-inbox.md` (it's gitignored, so a missed deletion doesn't leak into git history).
 - Any failure in the inbound path is caught and logged. The weekly run proceeds without requests, falling back to `notes.md` + family-context behavior — same as today.
