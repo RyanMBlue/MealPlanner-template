@@ -184,6 +184,21 @@ If anything unusual is coming up next week — travel, an event, an ingredient y
 - GitHub Actions: free tier for public repos, 2000 minutes/month for private — this uses maybe 20 minutes/month.
 - Total: **$0/month** on top of the Claude subscription you already pay for.
 
+## Tracking upstream fixes
+
+This repo was created with **Use this template**, so it shares no git history with
+the original — you can't `git pull` or `git merge` upstream. To pick up bug fixes
+after you've forked:
+
+    git remote add upstream https://github.com/RyanMBlue/MealPlanner-template.git
+    git fetch upstream
+    git log upstream/main --oneline        # find the fix commit(s) you want
+    git cherry-pick <sha>
+
+Cherry-pick only the commits you want. Your data files (`meal-history.md`,
+`family-context.md`, `current-week.md`, `notes.md`, `config.yml`) are yours —
+upstream fixes touch automation (`scripts/`, `prompts/`, `.github/`), not your data.
+
 ## When to retire this
 
 If after 3–4 months you never read the emails or always override the plan, kill it. You can disable workflows without deleting the repo (Settings → Actions → General → Disable).
