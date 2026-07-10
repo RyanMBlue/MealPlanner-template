@@ -10,7 +10,7 @@ Read these files from the repo root:
 - `family-context.md` — standing household preferences (ages, dislikes, kid blockers, equipment, etc.)
 - `meal-history.md` — running log of past meals
 - `current-week.md` — last week's plan (if it exists)
-- `notes.md` — forward-looking notes from Ryan/Gina about the upcoming week (head-count changes, travel, school events, ingredients to use up, etc.)
+- `notes.md` — forward-looking notes from the household about the upcoming week (head-count changes, travel, school events, ingredients to use up, etc.)
 - `requests-inbox.md` — captured replies to the Friday request email (optional; only present if the inbox-fetch step found something this week)
 
 ## Step 2: Determine the target week
@@ -158,7 +158,7 @@ Open `notes.md`. For each bullet in the "Active notes" section:
 - If the note references a date or date range that falls **within or before** the target week you just planned, delete that bullet.
 - If the note references a date **after** the target week, leave it alone (it's for a future plan).
 - If the note has no date and was a one-shot you applied this week (e.g. "use up the arborio rice"), delete it.
-- If the note has no date and is a standing preference for several weeks (e.g. "Gina avoiding dairy through May"), leave it alone.
+- If the note has no date and is a standing preference for several weeks (e.g. "someone avoiding dairy through May"), leave it alone.
 
 Rewrite `notes.md` with the kept bullets only. Preserve the file's header, the "How to write a note" section, the `## Active notes` heading, and the HTML comment marker — only edit the bullet list under it. If no bullets remain, leave the section empty (just the heading + comment marker).
 
