@@ -1,0 +1,6 @@
+# Weekly-plan workflow dependencies: the shared core plus bring-api, which is
+# only needed by the optional Bring! shopping-list push. Kept out of the core
+# file so the daily and Friday workflows don't install bring-api's heavier
+# transitive deps on every run.
+-r requirements.txt
+bring-api==1.1.2

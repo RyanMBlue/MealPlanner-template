@@ -56,7 +56,7 @@ jobs:
 
       - name: Install script dependencies
         if: steps.dst_guard.outputs.skip != 'true'
-        run: pip install pyyaml requests
+        run: pip install -r requirements.txt
 
       - name: Send reminder
         if: steps.dst_guard.outputs.skip != 'true'

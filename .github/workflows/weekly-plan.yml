@@ -39,7 +39,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install script dependencies
-        run: pip install pyyaml requests bring-api
+        run: pip install -r requirements-weekly.txt
 
       - name: Resolve target week
         # Single source of truth for which Monday this run plans. On the

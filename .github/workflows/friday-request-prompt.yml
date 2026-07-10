@@ -28,7 +28,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install script dependencies
-        run: pip install pyyaml requests
+        run: pip install -r requirements.txt
 
       - name: Send request prompt
         env:
